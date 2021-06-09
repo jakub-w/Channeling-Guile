@@ -1,0 +1,7 @@
+#+TITLE: Channeling Guile
+#+AUTHOR: Jakub Wojciech
+
+A GNU Guile wrapper for Channeling library.
+It works (at least I think it does, because it may be broken after the last Channeling merge) but is pretty basic.
+
+It's not completed yet, still copies message data between C++ world and Scheme world, fortunately one way only.
