@@ -1,11 +1,17 @@
 #pragma once
 
-inline void call_destructors(void* destructor) {
-  std::invoke(*static_cast<std::function<void()>*>(destructor));
+namespace detail {
+struct destructor_wrapper {
+  std::function<void()> dest;
+
+  static inline void invoke(void* dest_wrapper) {
+    static_cast<destructor_wrapper*>(dest_wrapper)->dest();
+  }
+};
 }
 
 template <typename Arg, typename... Args>
-auto make_destructor(Arg& arg, Args&... rest) {
+inline auto make_destructor(Arg& arg, Args&... rest) {
   return [&]{
     arg.~Arg();
     make_destructor(rest...)();
@@ -13,13 +19,19 @@ auto make_destructor(Arg& arg, Args&... rest) {
 }
 
 template <typename Arg>
-auto make_destructor(Arg& arg) {
+inline auto make_destructor(Arg& arg) {
   return [&]{ arg.~Arg(); };
 }
 
 template <typename... Args>
-inline void scm_dynwind_cpp_destroy(Args&... args){
-  static thread_local std::function<void()> destr;
-  destr = make_destructor(args...);
-  scm_dynwind_unwind_handler(&call_destructors, &destr, scm_t_wind_flags(0));
+inline void scm_dynwind_cpp_destroy(Args&... args) {
+  detail::destructor_wrapper* dest =
+      static_cast<detail::destructor_wrapper*>(
+          scm_gc_malloc_pointerless(sizeof(detail::destructor_wrapper),
+                                    "cpp-destructor"));
+
+  dest->dest = make_destructor(args...);
+
+  scm_dynwind_unwind_handler(&detail::destructor_wrapper::invoke, dest,
+                             scm_t_wind_flags(0));
 };
