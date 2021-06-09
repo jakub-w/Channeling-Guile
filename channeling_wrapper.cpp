@@ -15,6 +15,7 @@
 #include "libguile/strings.h"
 
 using namespace Channeling;
+using namespace guile_cpp_utils;
 
 template <typename Container>
 class bytes_wrapper final {

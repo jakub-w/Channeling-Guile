@@ -1,5 +1,6 @@
 #pragma once
 
+namespace guile_cpp_utils {
 namespace detail {
 struct destructor_wrapper {
   std::function<void()> dest;
@@ -35,3 +36,4 @@ inline void scm_dynwind_cpp_destroy(Args&... args) {
   scm_dynwind_unwind_handler(&detail::destructor_wrapper::invoke, dest,
                              scm_t_wind_flags(0));
 };
+}
