@@ -2,7 +2,8 @@
 
 namespace guile_cpp_utils {
 namespace detail {
-template <typename Fun>
+template <typename Fun,
+          typename = std::enable_if_t<std::is_trivially_destructible_v<Fun>>>
 struct destructor_wrapper {
   const Fun dest;
 
