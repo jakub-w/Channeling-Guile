@@ -17,8 +17,8 @@ struct destructor_wrapper {
 template <typename Arg, typename... Args>
 inline auto make_destructor(Arg& arg, Args&... rest) {
   return [&]{
-    arg.~Arg();
     make_destructor(rest...)();
+    arg.~Arg();
   };
 }
 
@@ -28,6 +28,9 @@ inline auto make_destructor(Arg& arg) {
 }
 }
 
+// Register ARGS objects to be destroyed on a non-local exit from the current
+// dynamic extent.
+// Must be used inside of a dynamic wind context.
 template <typename... Args>
 inline void scm_dynwind_cpp_destroy(Args&... args) {
   auto d = detail::make_destructor(args...);
