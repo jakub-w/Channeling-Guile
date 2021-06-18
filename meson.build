@@ -1,5 +1,5 @@
 project('channeling-guile', 'cpp',
-        default_options: ['cpp_std=c++17'])
+        default_options: ['cpp_std=c++20'])
 
 # Build types
 if get_option('buildtype').startswith('debug')
@@ -22,13 +22,14 @@ endif
 
 
 # Dependencies
-channeling_deps = [dependency('libzmq'),
-		   dependency('libsodium'),
-		   dependency('msgpack')]
-guile_dep = dependency('guile-3.0')
+channeling_deps = [dependency('libzmq', include_type: 'system'),
+		   dependency('libsodium', include_type: 'system'),
+		   dependency('msgpack', include_type: 'system')]
+guile_dep = dependency('guile-3.0', include_type: 'system')
 
 channeling_dep = declare_dependency(
-  sources: ['include/Channeling/EncryptionCommon.cpp',
+  sources: ['include/Channeling/Client.cpp',
+	    'include/Channeling/EncryptionCommon.cpp',
 	    'include/Channeling/SodiumCipherStream/SodiumCipherStream.cpp'],
   include_directories: ['include/Channeling'],
   dependencies: [dependency('libzmq'),

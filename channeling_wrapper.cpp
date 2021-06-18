@@ -186,34 +186,31 @@ SCM make_server(SCM password, SCM message_handler) {
   char* password_str = scm_to_utf8_string(password);
   scm_dynwind_free(password_str);
 
-  auto handshaker = std::make_shared<HandshakerType>(password_str);
+  auto cpp_handler = [message_handler](Bytes&& bytes){
+    scm_dynwind_begin(scm_t_dynwind_flags(0));
+    auto bytes_c = bytes_wrapper(std::move(bytes));
+    scm_dynwind_cpp_destroy(bytes_c);
 
-  ServerType* server = new ServerType{
-    std::move(handshaker),
-    [message_handler](Bytes&& bytes){
-      scm_dynwind_begin(scm_t_dynwind_flags(0));
-      auto bytes_c = bytes_wrapper(std::move(bytes));
-      scm_dynwind_cpp_destroy(bytes_c);
+    message_handler_data handler_data{message_handler, &bytes_c};
 
-      message_handler_data handler_data{message_handler, &bytes_c};
+    SCM result = scm_internal_catch(SCM_BOOL_T,
+                                    run_message_handler, &handler_data,
+                                    c_catch_handler, nullptr);
+    scm_remember_upto_here_1(message_handler);
 
-      SCM result = scm_internal_catch(SCM_BOOL_T,
-                                      run_message_handler, &handler_data,
-                                      c_catch_handler, nullptr);
-      scm_remember_upto_here_1(message_handler);
-
-      if (not scm_is_bytevector(result)) {
-        scm_dynwind_end();
-        throw std::logic_error(
-            "Server message handler returned a wrong type object. "
-            "Expected bytevector, got: " + scm_obj_to_str(result));
-      }
-
+    if (not scm_is_bytevector(result)) {
       scm_dynwind_end();
-
-      return scm_span(result);
+      throw std::logic_error(
+          "Server message handler returned a wrong type object. "
+          "Expected bytevector, got: " + scm_obj_to_str(result));
     }
+
+    scm_dynwind_end();
+
+    return scm_span(result);
   };
+
+  ServerType* server = new ServerType{std::move(cpp_handler), "password"};
 
   // FIXME: on non-local exit server should be destroyed
 
@@ -254,6 +251,7 @@ SCM server_run(SCM server) {
   return SCM_UNSPECIFIED;
 }
 
+// FIXME: This doesn't close the handshaker anymore.
 SCM server_close(SCM server) {
   scm_assert_foreign_object_type(server_type, server);
 
@@ -291,8 +289,7 @@ SCM make_client(SCM password) {
   char* password_str = scm_to_utf8_string(password);
   scm_dynwind_free(password_str);
 
-  ClientType* client = new ClientType{
-    std::make_shared<HandshakerType>(password_str)};
+  ClientType* client = new ClientType{password_str};
 
   // FIXME: on non-local exit client should be destroyed
 
@@ -329,7 +326,7 @@ SCM client_start(SCM client) {
       static_cast<ClientType*>(scm_foreign_object_ref(client, 0));
 
   scm_dynwind_begin(scm_t_dynwind_flags(0));
-  auto ec = client_c->Start();
+  auto ec = client_c->RunAsync();
   scm_dynwind_cpp_destroy(ec);
 
   if (ec) {
@@ -351,6 +348,7 @@ SCM client_start(SCM client) {
   return SCM_UNSPECIFIED;
 }
 
+// FIXME: This doesn't close the handshaker anymore.
 SCM client_stop(SCM client) {
   scm_assert_foreign_object_type(client_type, client);
 
